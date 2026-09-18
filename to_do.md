@@ -4,47 +4,49 @@ Ranked by value per line of code. Each item names the bug class it catches
 (tests) or the constraint it removes (features). Skip anything that doesn't
 map to a real defect or a real need.
 
+## Done (34 tests, CI green) — and what each one caught
+
+| Test file | Bug class | Found on first run |
+|---|---|---|
+| test_api_db_sync | create/update/delete persist exactly; GET reads storage not request; delete idempotent | — |
+| test_negative_persistence | 4xx must leave the table untouched | stand-in 500'd on missing fields, inserted checkout<=checkin |
+| test_api_db_sync (partial PUT) | update wipes fields not in body | stand-in did full replace → now merges; "missing field" can't be an error on PUT |
+| test_overlap | double-booking | — (built with gist EXCLUDE from the start) |
+| test_boundary_values | unicode/long/quoted names round-trip; blanks rejected | stand-in accepted `""` and `"   "` |
+| test_concurrency | lost writes; N racers for one slot → 1 row | — |
+| conftest leak guard | any test leaving rows behind | the first blank-name test leaked a row |
+| test_data_integrity | NULLs, dup ids, date order | — |
+
+Pattern so far: every defect was in validation-before-write. Every fix landed
+as a DB constraint (CHECK / EXCLUDE) first, app-level 4xx second.
+
 ## Tests — new bug classes
 
-- [x] **Negative persistence**: API returns 4xx on invalid payload (missing
-      field, checkout <= checkin, non-existent id) → assert row count unchanged.
-      Catches "validation fails but the insert already happened".
-- [x] **Partial update**: PUT with only some fields → assert untouched columns
-      keep their old values. Catches "update wipes fields not in the body".
-- [x] **Response vs. stored row**: compare `GET /booking/{id}` body to the DB
-      row, not just the request to the DB. Catches "API echoes request, reads
-      back something else".
-- [x] **Delete idempotence** / [ ] orphans: DELETE twice → second is 404 and count
-      unchanged. Once a second table exists (rooms, guests) → assert no
-      booking references a missing parent (FK check via `LEFT JOIN … IS NULL`).
-- [x] **Overlap constraint**: two bookings, same room, overlapping dates →
-      API rejects, DB has one row. Only when the API claims to prevent it.
-- [x] **Unicode / boundary values**: names with accents, apostrophes, 255+
-      chars, whitespace-only → DB stores exactly what was sent (or API rejects).
-- [x] **Concurrency**: N parallel creates (`concurrent.futures`) → N rows,
-      N distinct ids. Catches non-atomic id generation or lost writes.
+- [ ] **Update into overlap**: PUT that moves a booking onto another's dates →
+      409, row unchanged. The EXCLUDE constraint covers it, but nothing proves
+      the *update* path maps the violation to 409 rather than 500.
+- [ ] **FK orphans**: once a second table exists (rooms, guests) → assert no
+      booking references a missing parent (`LEFT JOIN … IS NULL`).
 - [ ] **Property-based**: `hypothesis` strategy for payloads → create, read
-      back from DB, compare. One test, many inputs. Add when hand-written
-      boundary cases stop finding anything.
+      back from DB, compare. One test, many inputs. Still deferred: the
+      hand-written boundary cases found two bugs last round.
 
 ## Test infrastructure
 
-- [ ] **DB assertion helper**: `assert_row_matches(row, payload)` already
-      exists in test_api_db_sync.py; move to conftest once a second test file
-      needs it, not before.
-- [x] **Per-test isolation guard**: session-start snapshot of row count →
-      session-end assert equal. Catches any test that leaks rows.
+- [ ] **DB assertion helper**: `assert_row_matches(row, payload)` lives in
+      test_api_db_sync.py; still only one file uses it. Leave it there.
+- [ ] **Unique room per test** (unblocks xdist, and removes the hard-coded
+      "room 1" the overlap tests assume): `booking` fixture takes roomid from
+      an itertools counter seeded by worker id; overlap tests read
+      `booking["roomid"]`.
 - [ ] **Schema drift check**: query `information_schema.columns` for
       `bookings` and compare to a frozen expected list. Catches a migration
       that silently renames/drops a column the tests never touch.
 - [ ] **Parametrize `test_api_db_sync` over a few payload shapes** instead of
       one fixed `payload()`.
-- [ ] **pytest-xdist**: verified NOT to work yet � the shared `booking` fixture
-      uses a fixed room/dates, so parallel workers hit the overlap constraint.
-      Fix: derive roomid from the worker id or a per-test counter; overlap
-      tests must then read `booking["roomid"]` instead of assuming room 1.
-- [x] **CI**: GitHub Actions job — `docker compose up -d --build`, `pytest`,
-      `compose down -v`. Cache the pip install.
+- [ ] **pytest-xdist**: `-n auto` → 9 failed / 10 errors. Blocked on the
+      unique-room item above; the leak guard also needs to be per-worker or
+      it'll flag other workers' in-flight rows.
 - [ ] **HTML/Allure report** on failure with the offending DB row dumped in
       the assertion message (already partly there via f-strings).
 
@@ -72,7 +74,11 @@ map to a real defect or a real need.
 
 ## Known ceilings (ponytail: comments in code)
 
-- `server/app.py` — stand-in API, single global connection, no validation.
-  Fine for a test double; not a service.
+- `server/app.py` — stand-in API: single global psycopg2 connection, shared
+  across Flask's threads. Held up under 20 concurrent racers, but that is
+  psycopg2's connection-level lock doing the work, not design. Fine for a
+  test double; not a service.
+- `server/app.py::merge` — validation is a hand-rolled dict merge. Swap for
+  pydantic if the payload grows a third nested object.
 - `conftest.py::api_client` — fixed 30s wait. Make it env-configurable if a
   slow CI runner needs more.
