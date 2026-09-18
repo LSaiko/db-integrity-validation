@@ -1,3 +1,5 @@
+import os
+
 import psycopg
 from psycopg.rows import dict_row
 
@@ -9,9 +11,9 @@ class DbClient:
     the tests verify the real persistence path rather than bypassing it.
     """
 
-    def __init__(self, dsn="postgresql://reader:reader@localhost:5433/bookings"):
+    def __init__(self, dsn=os.getenv("DB_URL", "postgresql://reader:reader@localhost:5433/bookings")):
         # `reader` role (see init.sql) has SELECT only: Postgres rejects writes, not just this class
-        self.conn = psycopg.connect(dsn, autocommit=True, row_factory=dict_row)
+        self.conn = psycopg.connect(dsn, autocommit=True, row_factory=dict_row, connect_timeout=3)
 
     def _select(self, sql, params=()):
         return self.conn.execute(sql, params).fetchall()

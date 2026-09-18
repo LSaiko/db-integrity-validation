@@ -3,6 +3,7 @@ import os
 import time
 
 import pytest
+import psycopg
 import requests
 
 from api.booking_client import BookingClient
@@ -48,7 +49,14 @@ def rows(db_client):
 
 @pytest.fixture(scope="session")
 def db_client():
-    client = DbClient()
+    deadline = time.time() + 30
+    while True:
+        try:
+            client = DbClient()
+            break
+        except psycopg.OperationalError as e:
+            assert time.time() < deadline, f"DB not reachable within 30s: {e}"
+            time.sleep(1)
     before = [r for r in client.get_all_bookings() if mine(r)]
     yield client
     leaked = [r for r in client.get_all_bookings() if mine(r) and r not in before]

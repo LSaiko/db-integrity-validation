@@ -77,6 +77,34 @@ broken. All setup and teardown goes through the API so that every row the
 tests observe came from the real write path, and every cleanup exercises the
 real delete path.
 
+## Running against a real service
+
+Two environment variables, nothing else:
+
+| Variable | Default (compose stack) | Set it to |
+|---|---|---|
+| `API_URL` | `http://localhost:5001/api` | the staging API base, e.g. `https://staging.example.com/api` |
+| `DB_URL` | `postgresql://reader:reader@localhost:5433/bookings` | a **SELECT-only** connection to that API's database (or a read replica) |
+
+```
+API_URL=https://staging.example.com/api DB_URL=postgresql://reader:...@replica:5432/bookings pytest
+```
+
+Then `docker compose` is not needed and `server/` can be deleted; the compose
+stack only exists to have something to test against locally.
+
+Ask the DBA for exactly what `init.sql` does for the `reader` role: a login
+role with `GRANT SELECT` on the tables under test and nothing else. That is
+what keeps the read-only guarantee true outside Docker: the test runner
+physically cannot write, so no test can accidentally set up state the API
+never produced. `tests/test_schema.py` will need its frozen column and
+constraint names updated to the real schema.
+
+If the real API does not enforce room overlap or blank-name validation,
+delete `tests/test_overlap.py` and the blank-name cases rather than weakening
+them; they document behaviour this stand-in has, not behaviour every booking
+API must have.
+
 ## About the Flask API
 
 The Flask service in `server/` is a stand-in for the real booking service. The

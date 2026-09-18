@@ -58,23 +58,25 @@ as a DB constraint (CHECK / EXCLUDE) first, app-level 4xx second.
 
 ## Flexible features
 
-- [ ] **Env-driven config**: `DATABASE_URL` and `API_URL` already read from
-      env in one place each; add a single `config.py` only when a third
-      setting appears.
-- [ ] **Point at a real service**: document (README) exactly which two
+- [x] **Env-driven config**: `DATABASE_URL` and `API_URL` already read from
+      env in one place each (`DB_URL` was hard-coded in `DbClient` until
+      this round). No `config.py`: two variables don't need a module.
+- [x] **Point at a real service**: document (README) exactly which two
       variables to set to run against a staging API + read replica, and
       delete `server/`. That was always the intent.
 - [ ] **Schema migrations**: replace `init.sql` with the real service's
       migration tool once there is one; keep `init.sql` as the fallback for
       the stand-in.
-- [ ] **Read-only role for the real DB**: the `reader` role pattern in
+- [x] **Read-only role for the real DB** (README, same section): the `reader` role pattern in
       `init.sql` is the thing to ask the DBA for on staging — SELECT-only
       credentials for the test runner, so the guarantee holds outside Docker.
 - [ ] **Extra tables**: when rooms/guests exist, extend `DbClient` with
       `get_*` for each and add FK-orphan checks to `test_data_integrity.py`.
-- [ ] **Wait for DB too**: `db_client` fixture currently assumes Postgres is
+- [x] **Wait for DB too**: `db_client` fixture currently assumes Postgres is
       up (compose healthcheck covers it); add the same retry loop as
       `api_client` if a non-compose environment ever needs it.
+      Found: without `connect_timeout` a refused connect on Windows blocks
+      20s+ per attempt, so the 30s budget was unenforceable.
 - [ ] **SQLAlchemy**: not needed. Two SELECTs don't justify an ORM. Revisit
       only if the query surface grows past ~10 methods.
 
