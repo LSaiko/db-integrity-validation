@@ -41,3 +41,18 @@ def test_partial_update_keeps_untouched_columns(api_client, booking, db_client):
     row = db_client.get_booking_by_id(booking["bookingid"])
     assert row["lastname"] == "Renamed"
     assert_row_matches(row, {**booking, "lastname": "Renamed"})  # everything else unchanged
+
+
+def test_api_response_matches_stored_row(api_client, booking, db_client):
+    """The GET body must be read back from storage, not echoed from the request."""
+    body = api_client.get_booking(booking["bookingid"]).json()
+    row = db_client.get_booking_by_id(booking["bookingid"])
+    assert body["bookingid"] == row["id"]
+    assert_row_matches(row, body)
+
+
+def test_delete_is_idempotent(api_client, booking, db_client):
+    assert api_client.delete_booking(booking["bookingid"]).status_code == 202
+    before = db_client.get_all_bookings()
+    assert api_client.delete_booking(booking["bookingid"]).status_code == 404
+    assert db_client.get_all_bookings() == before

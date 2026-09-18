@@ -7,9 +7,16 @@ import os
 from datetime import date
 
 import psycopg2
+from psycopg2.errors import ExclusionViolation
 from flask import Flask, abort, jsonify, request
 
 app = Flask(__name__)
+
+
+@app.errorhandler(ExclusionViolation)
+def overlap(_):
+    return jsonify(error="room already booked for those dates"), 409
+
 conn = psycopg2.connect(os.environ["DATABASE_URL"])
 conn.autocommit = True
 

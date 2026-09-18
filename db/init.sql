@@ -1,3 +1,5 @@
+CREATE EXTENSION btree_gist;  -- for the no-overlap exclusion constraint below
+
 CREATE TABLE bookings (
     id            SERIAL PRIMARY KEY,
     firstname     TEXT    NOT NULL,
@@ -5,7 +7,9 @@ CREATE TABLE bookings (
     checkin_date  DATE    NOT NULL,
     checkout_date DATE    NOT NULL,
     roomid        INTEGER NOT NULL,
-    CHECK (checkout_date > checkin_date)
+    CHECK (checkout_date > checkin_date),
+    -- same room, overlapping [checkin, checkout) ranges: the DB rejects it, API maps to 409
+    EXCLUDE USING gist (roomid WITH =, daterange(checkin_date, checkout_date) WITH &&)
 );
 -- no seed rows: tests create their own data through the API
 

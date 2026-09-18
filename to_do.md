@@ -11,13 +11,13 @@ map to a real defect or a real need.
       Catches "validation fails but the insert already happened".
 - [x] **Partial update**: PUT with only some fields → assert untouched columns
       keep their old values. Catches "update wipes fields not in the body".
-- [ ] **Response vs. stored row**: compare `GET /booking/{id}` body to the DB
+- [x] **Response vs. stored row**: compare `GET /booking/{id}` body to the DB
       row, not just the request to the DB. Catches "API echoes request, reads
       back something else".
-- [ ] **Delete idempotence / orphans**: DELETE twice → second is 404 and count
+- [x] **Delete idempotence** / [ ] orphans: DELETE twice → second is 404 and count
       unchanged. Once a second table exists (rooms, guests) → assert no
       booking references a missing parent (FK check via `LEFT JOIN … IS NULL`).
-- [ ] **Overlap constraint**: two bookings, same room, overlapping dates →
+- [x] **Overlap constraint**: two bookings, same room, overlapping dates →
       API rejects, DB has one row. Only when the API claims to prevent it.
 - [ ] **Unicode / boundary values**: names with accents, apostrophes, 255+
       chars, whitespace-only → DB stores exactly what was sent (or API rejects).

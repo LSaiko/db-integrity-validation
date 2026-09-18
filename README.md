@@ -21,11 +21,12 @@ all `bookings`) and a small Flask booking API on `http://localhost:5001/api`.
 api/booking_client.py      BookingClient: create/update/delete via HTTP, payload() helper
 db/db_client.py            DbClient: read-only psycopg access (get_booking_by_id, get_all_bookings)
 db/docker-compose.yml      Postgres + Flask API
-db/init.sql                bookings table (no seed rows) + SELECT-only `reader` role
+db/init.sql                bookings table + CHECK/EXCLUDE constraints, SELECT-only `reader` role
 server/app.py, Dockerfile  stand-in Flask booking API (the system under test)
 conftest.py                session-scoped api_client and db_client fixtures
 tests/test_api_db_sync.py  API write -> DB read checks for create, update, delete
 tests/test_negative_persistence.py  rejected requests leave the table untouched
+tests/test_overlap.py      double-booking a room is a 409 and writes nothing
 tests/test_data_integrity.py  NULL, uniqueness and date-ordering checks on all rows
 ```
 
