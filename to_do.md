@@ -4,89 +4,78 @@ Ranked by value per line of code. Each item names the bug class it catches
 (tests) or the constraint it removes (features). Skip anything that doesn't
 map to a real defect or a real need.
 
-## Done (41 tests, CI green, xdist-safe) — and what each one caught
+**Status (2026-09-18): backlog drained.** 41 tests, CI green, xdist-safe.
+Everything still open is blocked on pointing the suite at a real service.
 
-| Test file | Bug class | Found on first run |
+## Done — and what each one caught
+
+| Round | Item | Found on first run |
 |---|---|---|
-| test_api_db_sync | create/update/delete persist exactly; GET reads storage not request; delete idempotent | — |
-| test_negative_persistence | 4xx must leave the table untouched | stand-in 500'd on missing fields, inserted checkout<=checkin |
-| test_api_db_sync (partial PUT) | update wipes fields not in body | stand-in did full replace → now merges; "missing field" can't be an error on PUT |
-| test_overlap | double-booking | — (built with gist EXCLUDE from the start) |
-| test_boundary_values | unicode/long/quoted names round-trip; blanks rejected | stand-in accepted `""` and `"   "` |
-| test_concurrency | lost writes; N racers for one slot → 1 row | — |
-| test_overlap (update) | PUT into overlap → 409 not 500, row unchanged | — |
-| conftest leak guard | any test leaving rows behind | the first blank-name test leaked a row |
-| test_data_integrity | NULLs, dup ids, date order | — |
-| test_schema | column/constraint drift vs. frozen expectation | unnamed CHECK constraints |
+| 1 | sync tests: create/update/delete persist exactly | `conn.read_only = True` was a silent no-op under autocommit → replaced by a SELECT-only `reader` role |
+| 2 | negative persistence (4xx leaves table untouched) | stand-in 500'd on missing fields, inserted checkout<=checkin |
+| 2 | partial PUT keeps untouched columns | stand-in did full replace; "missing field" can't be an error on PUT |
+| 2 | CI workflow | — |
+| 3 | GET body == stored row | — |
+| 3 | delete idempotent | — |
+| 3 | room overlap → 409, one row | — (gist EXCLUDE from the start) |
+| 4 | unicode / long / quoted names round-trip; blanks rejected | stand-in accepted `""` and `"   "` |
+| 4 | 20 parallel creates; 20 racers for one slot → 1 row | — |
+| 4 | session leak guard | the first blank-name test leaked a row |
+| 5 | PUT into overlap → 409 not 500 | — |
+| 5 | unique room per test | a fixture requested by both the test and `booking` is the *same* value (pytest caches per test) |
+| 5 | xdist-safe | every before/after snapshot needed worker scoping, not just the leak guard |
+| 6 | schema drift (columns + constraints frozen) | Postgres auto-names table CHECKs `bookings_check`, `_check1` → constraints now named |
+| 6 | create parametrized over 5 date shapes (one-night, year-long, year boundary, leap day) | — |
+| 6 | HTML report artifact; failures print the full stored row | pytest-html / pytest-xdist missing from requirements.txt (CI caught it) |
+| 7 | `DB_URL` env override; DB wait loop | refused connect on Windows blocks 20s+/attempt → `connect_timeout=3` |
+| 7 | README: running against a real service, what to ask the DBA for | — |
 
-Pattern so far: every defect was in validation-before-write. Every fix landed
-as a DB constraint (CHECK / EXCLUDE) first, app-level 4xx second.
+Two patterns:
+- Every *data* defect was validation-before-write, and every fix landed as a
+  DB constraint (CHECK / EXCLUDE) first, app-level 4xx second.
+- Every *tooling* defect (no-op read_only, fixture caching, connect timeout,
+  missing pins) was found by deliberately running the failure path, not by
+  the green run. Keep doing that: break it on purpose, then fix.
 
-## Tests — new bug classes
+## Blocked on a real service
 
-- [x] **Update into overlap**: PUT that moves a booking onto another's dates →
-      409, row unchanged. The EXCLUDE constraint covers it, but nothing proves
-      the *update* path maps the violation to 409 rather than 500.
+Do these the day `API_URL` / `DB_URL` point at staging (README has the recipe):
+
+- [ ] **Re-freeze `tests/test_schema.py`** to the real columns and constraint
+      names. Expect this to be the first failure.
+- [ ] **Prune stand-in-specific tests**: if the real API doesn't enforce
+      overlap or blank names, delete `test_overlap.py` and the blank-name
+      cases. Don't weaken them.
 - [ ] **FK orphans**: once a second table exists (rooms, guests) → assert no
-      booking references a missing parent (`LEFT JOIN … IS NULL`).
-- [ ] **Property-based**: `hypothesis` strategy for payloads → create, read
-      back from DB, compare. One test, many inputs. Still deferred: the
-      hand-written boundary cases found two bugs last round.
-
-## Test infrastructure
-
-- [ ] **DB assertion helper**: `assert_row_matches(row, payload)` lives in
-      test_api_db_sync.py; still only one file uses it. Leave it there.
-- [x] **Unique room per test**: `roomid` fixture + per-worker 1000-room block.
-      Found: a fixture requested by both the test and `booking` is the *same*
-      value (pytest caches per test) — `booking` must draw its own room.
-- [x] **Schema drift check**: query `information_schema.columns` for
-      `bookings` and compare to a frozen expected list. Catches a migration
-      that silently renames/drops a column the tests never touch.
-      Found: Postgres auto-names table CHECKs `bookings_check`, `_check1` —
-      constraints are now named in init.sql so the test pins something real.
-- [x] **Parametrize `test_api_db_sync` over a few payload shapes** instead of
-      one fixed `payload()`.
-- [x] **pytest-xdist**: `-n 4` passes 3/3. Needed a worker-scoped `rows()`
-      fixture for every before/after table snapshot, not just the leak guard.
-      Not enabled in CI: 7s vs 3s serial — worker startup dominates until the
-      suite is much bigger.
-- [x] **HTML report** (pytest-html via pytest.ini, uploaded as a CI artifact;
-      `assert_row_matches` is now one dict compare so failures print the full
-      stored row) ~~Allure~~ on failure with the offending DB row dumped in
-      the assertion message (already partly there via f-strings).
-
-## Flexible features
-
-- [x] **Env-driven config**: `DATABASE_URL` and `API_URL` already read from
-      env in one place each (`DB_URL` was hard-coded in `DbClient` until
-      this round). No `config.py`: two variables don't need a module.
-- [x] **Point at a real service**: document (README) exactly which two
-      variables to set to run against a staging API + read replica, and
-      delete `server/`. That was always the intent.
+      booking references a missing parent (`LEFT JOIN … IS NULL`), and add
+      `get_*` to `DbClient` for each table.
 - [ ] **Schema migrations**: replace `init.sql` with the real service's
-      migration tool once there is one; keep `init.sql` as the fallback for
-      the stand-in.
-- [x] **Read-only role for the real DB** (README, same section): the `reader` role pattern in
-      `init.sql` is the thing to ask the DBA for on staging — SELECT-only
-      credentials for the test runner, so the guarantee holds outside Docker.
-- [ ] **Extra tables**: when rooms/guests exist, extend `DbClient` with
-      `get_*` for each and add FK-orphan checks to `test_data_integrity.py`.
-- [x] **Wait for DB too**: `db_client` fixture currently assumes Postgres is
-      up (compose healthcheck covers it); add the same retry loop as
-      `api_client` if a non-compose environment ever needs it.
-      Found: without `connect_timeout` a refused connect on Windows blocks
-      20s+ per attempt, so the 30s budget was unenforceable.
-- [ ] **SQLAlchemy**: not needed. Two SELECTs don't justify an ORM. Revisit
-      only if the query surface grows past ~10 methods.
+      migration tool; keep `init.sql` as the fallback for the stand-in.
+- [ ] **Delete `server/`** and the compose `api` service.
 
-## Known ceilings (ponytail: comments in code)
+## Deferred with a trigger
 
-- `server/app.py` — stand-in API: single global psycopg2 connection, shared
-  across Flask's threads. Held up under 20 concurrent racers, but that is
-  psycopg2's connection-level lock doing the work, not design. Fine for a
-  test double; not a service.
-- `server/app.py::merge` — validation is a hand-rolled dict merge. Swap for
-  pydantic if the payload grows a third nested object.
-- `conftest.py::api_client` — fixed 30s wait. Make it env-configurable if a
-  slow CI runner needs more.
+- [ ] **Property-based** (`hypothesis`): one create→read→compare test over a
+      payload strategy. Trigger: a full round of hand-written cases finds
+      nothing. Rounds 1–7 each found something, so not yet.
+- [ ] **xdist in CI**: trigger: serial suite > 30s. Currently 1s; `-n 4`
+      is 7× slower from worker startup.
+- [ ] **`config.py`**: trigger: a third environment variable.
+- [ ] **pydantic in `server/app.py::merge`**: trigger: a third nested object
+      in the payload — or just delete the stand-in (see above).
+- [ ] **Env-configurable wait budget** (`api_client` / `db_client` 30s):
+      trigger: a CI runner that actually needs it.
+
+## Won't do
+
+- **SQLAlchemy** — two SELECTs and a schema query don't justify an ORM.
+- **Move `assert_row_matches` to conftest** — one file uses it.
+- **Allure** — pytest-html already produces the artifact.
+
+## Known ceilings (`ponytail:` comments in code)
+
+- `server/app.py` — single global psycopg2 connection shared across Flask
+  threads. Survived 20 racers because of psycopg2's connection lock, not by
+  design. Fine for a test double; not a service.
+- `conftest.py` — 1000-room block per xdist worker; a single worker running
+  more than 1000 room-consuming tests would wrap into the next block.
