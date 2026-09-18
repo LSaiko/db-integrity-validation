@@ -4,7 +4,8 @@ CREATE TABLE bookings (
     lastname      TEXT    NOT NULL,
     checkin_date  DATE    NOT NULL,
     checkout_date DATE    NOT NULL,
-    roomid        INTEGER NOT NULL
+    roomid        INTEGER NOT NULL,
+    CHECK (checkout_date > checkin_date)
 );
 -- no seed rows: tests create their own data through the API
 

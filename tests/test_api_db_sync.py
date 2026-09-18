@@ -32,3 +32,12 @@ def test_delete_removes_row(api_client, booking, db_client):
     r = api_client.delete_booking(booking["bookingid"])
     assert r.status_code == 202, r.text
     assert db_client.get_booking_by_id(booking["bookingid"]) is None, "row still present after delete"
+
+
+def test_partial_update_keeps_untouched_columns(api_client, booking, db_client):
+    r = api_client.update_booking(booking["bookingid"], {"lastname": "Renamed"})
+    assert r.status_code == 200, r.text
+
+    row = db_client.get_booking_by_id(booking["bookingid"])
+    assert row["lastname"] == "Renamed"
+    assert_row_matches(row, {**booking, "lastname": "Renamed"})  # everything else unchanged

@@ -25,6 +25,7 @@ db/init.sql                bookings table (no seed rows) + SELECT-only `reader` 
 server/app.py, Dockerfile  stand-in Flask booking API (the system under test)
 conftest.py                session-scoped api_client and db_client fixtures
 tests/test_api_db_sync.py  API write -> DB read checks for create, update, delete
+tests/test_negative_persistence.py  rejected requests leave the table untouched
 tests/test_data_integrity.py  NULL, uniqueness and date-ordering checks on all rows
 ```
 

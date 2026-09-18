@@ -6,10 +6,10 @@ map to a real defect or a real need.
 
 ## Tests — new bug classes
 
-- [ ] **Negative persistence**: API returns 4xx on invalid payload (missing
+- [x] **Negative persistence**: API returns 4xx on invalid payload (missing
       field, checkout <= checkin, non-existent id) → assert row count unchanged.
       Catches "validation fails but the insert already happened".
-- [ ] **Partial update**: PUT with only some fields → assert untouched columns
+- [x] **Partial update**: PUT with only some fields → assert untouched columns
       keep their old values. Catches "update wipes fields not in the body".
 - [ ] **Response vs. stored row**: compare `GET /booking/{id}` body to the DB
       row, not just the request to the DB. Catches "API echoes request, reads
@@ -41,7 +41,7 @@ map to a real defect or a real need.
       one fixed `payload()`.
 - [ ] **pytest-xdist**: already installed; tests are independent via API-created
       rows, so `-n auto` should just work. Verify, then document.
-- [ ] **CI**: GitHub Actions job — `docker compose up -d --build`, `pytest`,
+- [x] **CI**: GitHub Actions job — `docker compose up -d --build`, `pytest`,
       `compose down -v`. Cache the pip install.
 - [ ] **HTML/Allure report** on failure with the offending DB row dumped in
       the assertion message (already partly there via f-strings).

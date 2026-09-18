@@ -4,9 +4,10 @@ ponytail: exists only because the public demo site's DB is unreachable;
 point BookingClient at the real service and drop this once one exists.
 """
 import os
+from datetime import date
 
 import psycopg2
-from flask import Flask, jsonify, request
+from flask import Flask, abort, jsonify, request
 
 app = Flask(__name__)
 conn = psycopg2.connect(os.environ["DATABASE_URL"])
@@ -21,16 +22,31 @@ def row_to_json(row):
             "roomid": row[5]}
 
 
-def values(body):
-    d = body["bookingdates"]
-    return (body["firstname"], body["lastname"], d["checkin"], d["checkout"], body["roomid"])
+def merge(body, row=None):
+    """Request body over the existing row (partial PUT); returns validated column values or aborts 400."""
+    cur = row_to_json(row) if row else {}
+    d = {**cur.get("bookingdates", {}), **body.get("bookingdates", {})}
+    v = {"firstname": body.get("firstname", cur.get("firstname")),
+         "lastname": body.get("lastname", cur.get("lastname")),
+         "checkin": d.get("checkin"), "checkout": d.get("checkout"),
+         "roomid": body.get("roomid", cur.get("roomid"))}
+    missing = [k for k, x in v.items() if x is None]
+    if missing:
+        abort(400, f"missing fields: {missing}")
+    try:
+        ci, co = date.fromisoformat(v["checkin"]), date.fromisoformat(v["checkout"])
+    except (TypeError, ValueError):
+        abort(400, "dates must be ISO YYYY-MM-DD")
+    if co <= ci:
+        abort(400, "checkout must be after checkin")
+    return (v["firstname"], v["lastname"], ci, co, v["roomid"])
 
 
 @app.post("/api/booking")
 def create():
     with conn.cursor() as cur:
         cur.execute("INSERT INTO bookings (firstname, lastname, checkin_date, checkout_date, roomid) "
-                    "VALUES (%s, %s, %s, %s, %s) RETURNING id", values(request.json))
+                    "VALUES (%s, %s, %s, %s, %s) RETURNING id", merge(request.json))
         return jsonify(bookingid=cur.fetchone()[0]), 201
 
 
@@ -45,9 +61,13 @@ def get(bid):
 @app.put("/api/booking/<int:bid>")
 def update(bid):
     with conn.cursor() as cur:
+        cur.execute(f"SELECT {COLS} FROM bookings WHERE id = %s", (bid,))
+        row = cur.fetchone()
+        if not row:
+            return "", 404
         cur.execute("UPDATE bookings SET firstname=%s, lastname=%s, checkin_date=%s, checkout_date=%s, roomid=%s "
-                    "WHERE id = %s", values(request.json) + (bid,))
-        return ("", 404) if cur.rowcount == 0 else (jsonify(bookingid=bid), 200)
+                    "WHERE id = %s", merge(request.json, row) + (bid,))
+        return jsonify(bookingid=bid), 200
 
 
 @app.delete("/api/booking/<int:bid>")
