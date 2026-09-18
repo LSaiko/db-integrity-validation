@@ -17,15 +17,15 @@ def test_create_persists_exact_values(booking, db_client):
     assert_row_matches(row, booking)
 
 
-def test_update_persists_new_values_without_duplicate(api_client, booking, db_client):
-    before = len(db_client.get_all_bookings())
-    new = BookingClient.payload(roomid=2, checkin="2027-06-10", checkout="2027-06-12",
+def test_update_persists_new_values_without_duplicate(api_client, booking, db_client, roomid, rows):
+    before = len(rows())
+    new = BookingClient.payload(roomid=roomid, checkin="2027-06-10", checkout="2027-06-12",
                                 firstname="Updated", lastname="Person")
     r = api_client.update_booking(booking["bookingid"], new)
     assert r.status_code == 200, r.text
 
     assert_row_matches(db_client.get_booking_by_id(booking["bookingid"]), new)
-    assert len(db_client.get_all_bookings()) == before, "update must modify in place, not insert"
+    assert len(rows()) == before, "update must modify in place, not insert"
 
 
 def test_delete_removes_row(api_client, booking, db_client):
@@ -51,8 +51,8 @@ def test_api_response_matches_stored_row(api_client, booking, db_client):
     assert_row_matches(row, body)
 
 
-def test_delete_is_idempotent(api_client, booking, db_client):
+def test_delete_is_idempotent(api_client, booking, db_client, rows):
     assert api_client.delete_booking(booking["bookingid"]).status_code == 202
-    before = db_client.get_all_bookings()
+    before = rows()
     assert api_client.delete_booking(booking["bookingid"]).status_code == 404
-    assert db_client.get_all_bookings() == before
+    assert rows() == before

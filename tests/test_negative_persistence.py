@@ -13,11 +13,11 @@ BAD_PAYLOADS = {
 
 
 @pytest.mark.parametrize("data", BAD_PAYLOADS.values(), ids=BAD_PAYLOADS.keys())
-def test_invalid_create_writes_nothing(api_client, db_client, data):
-    before = db_client.get_all_bookings()
+def test_invalid_create_writes_nothing(api_client, db_client, data, rows):
+    before = rows()
     r = api_client.create_booking(data)
     assert 400 <= r.status_code < 500, r.text
-    assert db_client.get_all_bookings() == before
+    assert rows() == before
 
 
 # PUT is partial: a missing field is valid there, so only the date cases apply
@@ -32,8 +32,8 @@ def test_invalid_update_changes_nothing(api_client, booking, db_client, data):
     assert db_client.get_booking_by_id(booking["bookingid"]) == before
 
 
-def test_update_and_delete_of_missing_id_write_nothing(api_client, db_client):
-    before = db_client.get_all_bookings()
+def test_update_and_delete_of_missing_id_write_nothing(api_client, db_client, rows):
+    before = rows()
     assert api_client.update_booking(0, BookingClient.payload()).status_code == 404
     assert api_client.delete_booking(0).status_code == 404
-    assert db_client.get_all_bookings() == before
+    assert rows() == before

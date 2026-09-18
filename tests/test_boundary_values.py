@@ -15,8 +15,8 @@ NAMES = {
 
 
 @pytest.mark.parametrize("name", NAMES.values(), ids=NAMES.keys())
-def test_name_round_trips_exactly(api_client, db_client, name):
-    r = api_client.create_booking(BookingClient.payload(roomid=9, firstname=name, lastname=name))
+def test_name_round_trips_exactly(api_client, db_client, roomid, name):
+    r = api_client.create_booking(BookingClient.payload(roomid=roomid, firstname=name, lastname=name))
     assert r.status_code == 201, r.text
     bid = r.json()["bookingid"]
     try:
@@ -27,8 +27,8 @@ def test_name_round_trips_exactly(api_client, db_client, name):
 
 
 @pytest.mark.parametrize("name", ["", "   "], ids=["empty", "whitespace_only"])
-def test_blank_name_rejected_and_not_stored(api_client, db_client, name):
-    before = db_client.get_all_bookings()
-    r = api_client.create_booking(BookingClient.payload(roomid=9, firstname=name))
+def test_blank_name_rejected_and_not_stored(api_client, db_client, roomid, name, rows):
+    before = rows()
+    r = api_client.create_booking(BookingClient.payload(roomid=roomid, firstname=name))
     assert r.status_code == 400, r.text
-    assert db_client.get_all_bookings() == before
+    assert rows() == before

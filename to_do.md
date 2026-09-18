@@ -4,7 +4,7 @@ Ranked by value per line of code. Each item names the bug class it catches
 (tests) or the constraint it removes (features). Skip anything that doesn't
 map to a real defect or a real need.
 
-## Done (34 tests, CI green) — and what each one caught
+## Done (35 tests, CI green, xdist-safe) — and what each one caught
 
 | Test file | Bug class | Found on first run |
 |---|---|---|
@@ -14,6 +14,7 @@ map to a real defect or a real need.
 | test_overlap | double-booking | — (built with gist EXCLUDE from the start) |
 | test_boundary_values | unicode/long/quoted names round-trip; blanks rejected | stand-in accepted `""` and `"   "` |
 | test_concurrency | lost writes; N racers for one slot → 1 row | — |
+| test_overlap (update) | PUT into overlap → 409 not 500, row unchanged | — |
 | conftest leak guard | any test leaving rows behind | the first blank-name test leaked a row |
 | test_data_integrity | NULLs, dup ids, date order | — |
 
@@ -22,7 +23,7 @@ as a DB constraint (CHECK / EXCLUDE) first, app-level 4xx second.
 
 ## Tests — new bug classes
 
-- [ ] **Update into overlap**: PUT that moves a booking onto another's dates →
+- [x] **Update into overlap**: PUT that moves a booking onto another's dates →
       409, row unchanged. The EXCLUDE constraint covers it, but nothing proves
       the *update* path maps the violation to 409 rather than 500.
 - [ ] **FK orphans**: once a second table exists (rooms, guests) → assert no
@@ -35,18 +36,18 @@ as a DB constraint (CHECK / EXCLUDE) first, app-level 4xx second.
 
 - [ ] **DB assertion helper**: `assert_row_matches(row, payload)` lives in
       test_api_db_sync.py; still only one file uses it. Leave it there.
-- [ ] **Unique room per test** (unblocks xdist, and removes the hard-coded
-      "room 1" the overlap tests assume): `booking` fixture takes roomid from
-      an itertools counter seeded by worker id; overlap tests read
-      `booking["roomid"]`.
+- [x] **Unique room per test**: `roomid` fixture + per-worker 1000-room block.
+      Found: a fixture requested by both the test and `booking` is the *same*
+      value (pytest caches per test) — `booking` must draw its own room.
 - [ ] **Schema drift check**: query `information_schema.columns` for
       `bookings` and compare to a frozen expected list. Catches a migration
       that silently renames/drops a column the tests never touch.
 - [ ] **Parametrize `test_api_db_sync` over a few payload shapes** instead of
       one fixed `payload()`.
-- [ ] **pytest-xdist**: `-n auto` → 9 failed / 10 errors. Blocked on the
-      unique-room item above; the leak guard also needs to be per-worker or
-      it'll flag other workers' in-flight rows.
+- [x] **pytest-xdist**: `-n 4` passes 3/3. Needed a worker-scoped `rows()`
+      fixture for every before/after table snapshot, not just the leak guard.
+      Not enabled in CI: 7s vs 3s serial — worker startup dominates until the
+      suite is much bigger.
 - [ ] **HTML/Allure report** on failure with the offending DB row dumped in
       the assertion message (already partly there via f-strings).
 

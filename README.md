@@ -9,7 +9,7 @@ few structural checks on the stored data itself.
 ```
 docker compose -f db/docker-compose.yml up -d --build
 pip install -r requirements.txt
-pytest
+pytest            # or: pytest -n auto (parallel-safe; each worker owns a block of room ids)
 ```
 
 The compose file starts Postgres on port 5433 (database, user and password are
