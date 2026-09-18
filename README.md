@@ -27,6 +27,8 @@ conftest.py                session-scoped api_client and db_client fixtures
 tests/test_api_db_sync.py  API write -> DB read checks for create, update, delete
 tests/test_negative_persistence.py  rejected requests leave the table untouched
 tests/test_overlap.py      double-booking a room is a 409 and writes nothing
+tests/test_boundary_values.py  unicode/long/quoted names round-trip exactly; blanks rejected
+tests/test_concurrency.py  N parallel creates -> N rows; N racers for one slot -> 1 row
 tests/test_data_integrity.py  NULL, uniqueness and date-ordering checks on all rows
 ```
 

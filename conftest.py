@@ -25,8 +25,11 @@ def api_client():
 @pytest.fixture(scope="session")
 def db_client():
     client = DbClient()
+    before = client.get_all_bookings()
     yield client
+    leaked = [r for r in client.get_all_bookings() if r not in before]
     client.close()
+    assert not leaked, f"tests leaked rows (a test wrote via the API without cleaning up): {leaked}"
 
 
 @pytest.fixture

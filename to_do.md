@@ -19,9 +19,9 @@ map to a real defect or a real need.
       booking references a missing parent (FK check via `LEFT JOIN … IS NULL`).
 - [x] **Overlap constraint**: two bookings, same room, overlapping dates →
       API rejects, DB has one row. Only when the API claims to prevent it.
-- [ ] **Unicode / boundary values**: names with accents, apostrophes, 255+
+- [x] **Unicode / boundary values**: names with accents, apostrophes, 255+
       chars, whitespace-only → DB stores exactly what was sent (or API rejects).
-- [ ] **Concurrency**: N parallel creates (`concurrent.futures`) → N rows,
+- [x] **Concurrency**: N parallel creates (`concurrent.futures`) → N rows,
       N distinct ids. Catches non-atomic id generation or lost writes.
 - [ ] **Property-based**: `hypothesis` strategy for payloads → create, read
       back from DB, compare. One test, many inputs. Add when hand-written
@@ -32,15 +32,17 @@ map to a real defect or a real need.
 - [ ] **DB assertion helper**: `assert_row_matches(row, payload)` already
       exists in test_api_db_sync.py; move to conftest once a second test file
       needs it, not before.
-- [ ] **Per-test isolation guard**: session-start snapshot of row count →
+- [x] **Per-test isolation guard**: session-start snapshot of row count →
       session-end assert equal. Catches any test that leaks rows.
 - [ ] **Schema drift check**: query `information_schema.columns` for
       `bookings` and compare to a frozen expected list. Catches a migration
       that silently renames/drops a column the tests never touch.
 - [ ] **Parametrize `test_api_db_sync` over a few payload shapes** instead of
       one fixed `payload()`.
-- [ ] **pytest-xdist**: already installed; tests are independent via API-created
-      rows, so `-n auto` should just work. Verify, then document.
+- [ ] **pytest-xdist**: verified NOT to work yet � the shared `booking` fixture
+      uses a fixed room/dates, so parallel workers hit the overlap constraint.
+      Fix: derive roomid from the worker id or a per-test counter; overlap
+      tests must then read `booking["roomid"]` instead of assuming room 1.
 - [x] **CI**: GitHub Actions job — `docker compose up -d --build`, `pytest`,
       `compose down -v`. Cache the pip install.
 - [ ] **HTML/Allure report** on failure with the offending DB row dumped in

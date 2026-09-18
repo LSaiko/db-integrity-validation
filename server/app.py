@@ -40,6 +40,8 @@ def merge(body, row=None):
     missing = [k for k, x in v.items() if x is None]
     if missing:
         abort(400, f"missing fields: {missing}")
+    if not str(v["firstname"]).strip() or not str(v["lastname"]).strip():
+        abort(400, "names must not be blank")
     try:
         ci, co = date.fromisoformat(v["checkin"]), date.fromisoformat(v["checkout"])
     except (TypeError, ValueError):

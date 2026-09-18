@@ -8,6 +8,7 @@ CREATE TABLE bookings (
     checkout_date DATE    NOT NULL,
     roomid        INTEGER NOT NULL,
     CHECK (checkout_date > checkin_date),
+    CHECK (btrim(firstname) <> '' AND btrim(lastname) <> ''),
     -- same room, overlapping [checkin, checkout) ranges: the DB rejects it, API maps to 409
     EXCLUDE USING gist (roomid WITH =, daterange(checkin_date, checkout_date) WITH &&)
 );
