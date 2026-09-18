@@ -13,4 +13,9 @@ jobs:
       - run: docker compose -f db/docker-compose.yml up -d --build --wait
       - run: pytest -v
       - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-report
+          path: reports/report.html
+      - if: always()
         run: docker compose -f db/docker-compose.yml down -v

@@ -4,7 +4,7 @@ Ranked by value per line of code. Each item names the bug class it catches
 (tests) or the constraint it removes (features). Skip anything that doesn't
 map to a real defect or a real need.
 
-## Done (35 tests, CI green, xdist-safe) — and what each one caught
+## Done (41 tests, CI green, xdist-safe) — and what each one caught
 
 | Test file | Bug class | Found on first run |
 |---|---|---|
@@ -17,6 +17,7 @@ map to a real defect or a real need.
 | test_overlap (update) | PUT into overlap → 409 not 500, row unchanged | — |
 | conftest leak guard | any test leaving rows behind | the first blank-name test leaked a row |
 | test_data_integrity | NULLs, dup ids, date order | — |
+| test_schema | column/constraint drift vs. frozen expectation | unnamed CHECK constraints |
 
 Pattern so far: every defect was in validation-before-write. Every fix landed
 as a DB constraint (CHECK / EXCLUDE) first, app-level 4xx second.
@@ -39,16 +40,20 @@ as a DB constraint (CHECK / EXCLUDE) first, app-level 4xx second.
 - [x] **Unique room per test**: `roomid` fixture + per-worker 1000-room block.
       Found: a fixture requested by both the test and `booking` is the *same*
       value (pytest caches per test) — `booking` must draw its own room.
-- [ ] **Schema drift check**: query `information_schema.columns` for
+- [x] **Schema drift check**: query `information_schema.columns` for
       `bookings` and compare to a frozen expected list. Catches a migration
       that silently renames/drops a column the tests never touch.
-- [ ] **Parametrize `test_api_db_sync` over a few payload shapes** instead of
+      Found: Postgres auto-names table CHECKs `bookings_check`, `_check1` —
+      constraints are now named in init.sql so the test pins something real.
+- [x] **Parametrize `test_api_db_sync` over a few payload shapes** instead of
       one fixed `payload()`.
 - [x] **pytest-xdist**: `-n 4` passes 3/3. Needed a worker-scoped `rows()`
       fixture for every before/after table snapshot, not just the leak guard.
       Not enabled in CI: 7s vs 3s serial — worker startup dominates until the
       suite is much bigger.
-- [ ] **HTML/Allure report** on failure with the offending DB row dumped in
+- [x] **HTML report** (pytest-html via pytest.ini, uploaded as a CI artifact;
+      `assert_row_matches` is now one dict compare so failures print the full
+      stored row) ~~Allure~~ on failure with the offending DB row dumped in
       the assertion message (already partly there via f-strings).
 
 ## Flexible features

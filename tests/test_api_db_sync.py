@@ -1,20 +1,43 @@
 from datetime import date
 
+import pytest
+
 from api.booking_client import BookingClient
 
 
+def as_row(data):
+    """Request/response payload -> the DB row shape it should have produced."""
+    return {"firstname": data["firstname"], "lastname": data["lastname"], "roomid": data["roomid"],
+            "checkin_date": date.fromisoformat(data["bookingdates"]["checkin"]),
+            "checkout_date": date.fromisoformat(data["bookingdates"]["checkout"])}
+
+
 def assert_row_matches(row, data):
-    assert row["firstname"] == data["firstname"]
-    assert row["lastname"] == data["lastname"]
-    assert row["roomid"] == data["roomid"]
-    assert row["checkin_date"] == date.fromisoformat(data["bookingdates"]["checkin"])
-    assert row["checkout_date"] == date.fromisoformat(data["bookingdates"]["checkout"])
+    # single dict compare: on failure pytest prints the full stored row next to the expected one
+    assert {k: v for k, v in row.items() if k != "id"} == as_row(data), f"stored row: {row}"
 
 
-def test_create_persists_exact_values(booking, db_client):
-    row = db_client.get_booking_by_id(booking["bookingid"])
-    assert row is not None, "API returned 201 but no row exists in the DB"
-    assert_row_matches(row, booking)
+SHAPES = {
+    "typical": dict(firstname="Ada", lastname="Lovelace", checkin="2027-05-01", checkout="2027-05-03"),
+    "one_night": dict(firstname="A", lastname="B", checkin="2027-05-01", checkout="2027-05-02"),
+    "long_stay": dict(firstname="Long", lastname="Stay", checkin="2027-01-01", checkout="2027-12-31"),
+    "year_boundary": dict(firstname="New", lastname="Year", checkin="2027-12-31", checkout="2028-01-01"),
+    "leap_day": dict(firstname="Leap", lastname="Day", checkin="2028-02-28", checkout="2028-03-01"),
+}
+
+
+@pytest.mark.parametrize("shape", SHAPES.values(), ids=SHAPES.keys())
+def test_create_persists_exact_values(api_client, db_client, roomid, shape):
+    data = BookingClient.payload(roomid=roomid, **shape)
+    r = api_client.create_booking(data)
+    assert r.status_code == 201, r.text
+    bid = r.json()["bookingid"]
+    try:
+        row = db_client.get_booking_by_id(bid)
+        assert row is not None, "API returned 201 but no row exists in the DB"
+        assert_row_matches(row, data)
+    finally:
+        api_client.delete_booking(bid)
 
 
 def test_update_persists_new_values_without_duplicate(api_client, booking, db_client, roomid, rows):

@@ -12,6 +12,8 @@ pip install -r requirements.txt
 pytest            # or: pytest -n auto (parallel-safe; each worker owns a block of room ids)
 ```
 
+Every run writes `reports/report.html` (CI uploads it as an artifact).
+
 The compose file starts Postgres on port 5433 (database, user and password are
 all `bookings`) and a small Flask booking API on `http://localhost:5001/api`.
 
@@ -29,6 +31,7 @@ tests/test_negative_persistence.py  rejected requests leave the table untouched
 tests/test_overlap.py      double-booking a room is a 409 and writes nothing
 tests/test_boundary_values.py  unicode/long/quoted names round-trip exactly; blanks rejected
 tests/test_concurrency.py  N parallel creates -> N rows; N racers for one slot -> 1 row
+tests/test_schema.py       columns + named constraints match a frozen expectation
 tests/test_data_integrity.py  NULL, uniqueness and date-ordering checks on all rows
 ```
 

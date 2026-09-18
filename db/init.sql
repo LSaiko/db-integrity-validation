@@ -7,10 +7,10 @@ CREATE TABLE bookings (
     checkin_date  DATE    NOT NULL,
     checkout_date DATE    NOT NULL,
     roomid        INTEGER NOT NULL,
-    CHECK (checkout_date > checkin_date),
-    CHECK (btrim(firstname) <> '' AND btrim(lastname) <> ''),
+    CONSTRAINT checkout_after_checkin CHECK (checkout_date > checkin_date),
+    CONSTRAINT names_not_blank CHECK (btrim(firstname) <> '' AND btrim(lastname) <> ''),
     -- same room, overlapping [checkin, checkout) ranges: the DB rejects it, API maps to 409
-    EXCLUDE USING gist (roomid WITH =, daterange(checkin_date, checkout_date) WITH &&)
+    CONSTRAINT no_double_booking EXCLUDE USING gist (roomid WITH =, daterange(checkin_date, checkout_date) WITH &&)
 );
 -- no seed rows: tests create their own data through the API
 
